@@ -1,0 +1,49 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DataBase — admin.css
+   Pending approvals · Audit log · Charts grid
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Pending Approvals ────────────────────────────────────────────────────── */
+.pending-card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 1rem 1.25rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  margin-bottom: 0.65rem; transition: var(--transition);
+}
+
+.pending-card:hover { border-color: var(--border-hover); }
+.pending-info  { display: flex; align-items: center; gap: 0.75rem; }
+.pending-name  { font-weight: 600; color: var(--text-primary); font-size: 0.9rem; }
+.pending-time  { font-size: 0.75rem; color: var(--text-secondary); }
+
+/* ── Audit Log ────────────────────────────────────────────────────────────── */
+.audit-item {
+  display: flex; align-items: flex-start; gap: 0.85rem;
+  padding: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.audit-item:last-child { border-bottom: none; }
+.audit-dot    { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; margin-top: 6px; }
+.audit-action { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
+.audit-detail { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+.audit-time   { font-size: 0.72rem; color: var(--text-muted); margin-left: auto; white-space: nowrap; }
+
+/* ── Charts ───────────────────────────────────────────────────────────────── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.chart-card {
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 1.25rem;
+  transition: var(--transition);
+}
+
+.chart-card:hover { border-color: var(--border-hover); }
+
+.chart-title    { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.2rem; }
+.chart-subtitle { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem; }
+
+.chart-container { position: relative; }

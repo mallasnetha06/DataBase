@@ -1,0 +1,2105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataBase — Internal Data Management System</title>
+  <meta name="description"
+    content="Internal LAN-based data management system with Data Scraping and Employee Progress tracking, with role-based access control.">
+  <!-- CSS: split by feature area -->
+  <link rel="stylesheet" href="/static/css/base.css?v=8">
+  <link rel="stylesheet" href="/static/css/layout.css?v=8">
+  <link rel="stylesheet" href="/static/css/components.css?v=8">
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=8">
+  <link rel="stylesheet" href="/static/css/scraping.css?v=13">
+  <link rel="stylesheet" href="/static/css/admin.css?v=7">
+  <link rel="stylesheet" href="/static/css/templates.css?v=1">
+  <link rel="stylesheet" href="/static/css/campaign-composer.css?v=2">
+  <link rel="stylesheet" href="/static/css/overlord.css?v=1">
+  <link rel="stylesheet" href="/static/css/manager.css?v=2">
+  <link rel="stylesheet" href="/static/css/kanban.css?v=1">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Interact.js — drag & resize for dashboard -->
+  <script src="https://cdn.jsdelivr.net/npm/interactjs@1.10.27/dist/interact.min.js"></script>
+  <!-- SheetJS — client-side Excel parsing for upload preview -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+
+<body>
+
+  <!-- ═══════════ AUTH SCREEN ═══════════ -->
+  <div id="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <div class="logo-icon">🗄️</div>
+        <h1>DataBase</h1>
+        <p>Internal Data Management System</p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Sign In</button>
+        <button class="auth-tab" id="tab-register" onclick="switchAuthTab('register')">Register</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label" for="login-username">Username</label>
+          <input id="login-username" class="form-input" type="text" placeholder="Enter your username" required
+            autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password</label>
+          <input id="login-password" class="form-input" type="password" placeholder="Enter your password" required
+            autocomplete="current-password">
+        </div>
+        <button type="submit" id="btn-login" class="btn btn-primary btn-full" style="margin-top:0.5rem">
+          <span>Sign In</span>
+        </button>
+        <p id="login-error" class="text-sm"
+          style="color:var(--danger);margin-top:0.75rem;text-align:center;display:none"></p>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" onsubmit="handleRegister(event)" class="hidden">
+        <div class="form-group">
+          <label class="form-label" for="reg-username">Username</label>
+          <input id="reg-username" class="form-input" type="text" placeholder="Choose a username" required
+            autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg-password">Password</label>
+          <input id="reg-password" class="form-input" type="password" placeholder="At least 6 characters" required
+            autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="reg-role">Account Type</label>
+          <select id="reg-role" class="form-input" onchange="onRegRoleChange()" required>
+            <option value="standard">Standard User (Team Member)</option>
+            <option value="campaigner">Campaigner</option>
+          </select>
+        </div>
+        <div class="form-group" id="reg-teamlead-group">
+          <label class="form-label" for="reg-teamlead">Team Lead</label>
+          <select id="reg-teamlead" class="form-input">
+            <option value="">-- Select your Team Lead --</option>
+          </select>
+        </div>
+        <button type="submit" id="btn-register" class="btn btn-success btn-full" style="margin-top:0.5rem">
+          <span>Create Account</span>
+        </button>
+        <p id="register-msg" class="text-sm" style="margin-top:0.75rem;text-align:center;display:none"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══════════ MAIN APP ═══════════ -->
+  <div id="app-screen" class="hidden">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-mark">🗄️</div>
+        <span>DataBase</span>
+      </div>
+
+      <div class="nav-section-label non-manager non-campaigner non-overlord">Main</div>
+      <div class="nav-item active non-manager non-campaigner non-overlord" id="nav-dashboard" onclick="showPanel('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
+      </div>
+
+      <div class="nav-section-label non-manager non-overlord">Data Scraping</div>
+      <div class="nav-item non-manager non-overlord" id="nav-scraping-all" onclick="showPanel('scraping-all')">
+        <span class="nav-icon">🔍</span> All Records
+      </div>
+      <div class="nav-item non-manager non-overlord" id="nav-scraping-mine" onclick="showPanel('scraping-mine')">
+        <span class="nav-icon">📁</span> My Collection
+      </div>
+      <div class="nav-item non-manager non-overlord" id="nav-scraping-upload" onclick="showPanel('scraping-upload')">
+        <span class="nav-icon">⬆️</span> Upload
+      </div>
+      <div class="nav-item non-manager non-campaigner non-overlord" id="nav-templates" onclick="showPanel('templates')">
+        <span class="nav-icon">📝</span> Templates
+      </div>
+      <div class="nav-item non-manager non-campaigner non-overlord" id="nav-campaign-composer"
+        onclick="showPanel('campaign-composer')">
+        <span class="nav-icon">🎯</span> Campaign Composer
+      </div>
+
+      <div class="nav-section-label non-manager non-campaigner non-overlord">Employee Progress</div>
+      <div class="nav-item non-manager non-campaigner non-overlord" id="nav-kanban-mine" onclick="showPanel('kanban-mine')">
+        <span class="nav-icon">🗂️</span> My Task Board
+      </div>
+      <div class="nav-item hidden non-campaigner non-overlord" id="nav-kanban-admin"
+        onclick="showPanel('kanban-admin')">
+        <span class="nav-icon">📋</span> Manage Sheets
+      </div>
+      <div class="nav-item admin-only hidden non-campaigner non-overlord" id="nav-progress-charts"
+        onclick="showPanel('progress-charts')">
+        <span class="nav-icon">📈</span> Progress Charts
+      </div>
+
+      <div class="nav-section-label admin-only hidden non-campaigner">Admin</div>
+      <div class="nav-item admin-only hidden non-campaigner" id="nav-users" onclick="showPanel('users')">
+        <span class="nav-icon">👤</span> Users
+        <span class="badge-count hidden" id="pending-badge">0</span>
+      </div>
+      <div class="nav-item admin-only hidden non-campaigner" id="nav-audit" onclick="showPanel('audit')">
+        <span class="nav-icon">🔐</span> Audit Log
+      </div>
+
+      <div class="nav-section-label manager-only hidden" style="color:#a78bfa">🎯 Manager</div>
+      <div class="nav-item manager-only hidden" id="nav-manager-dashboard" onclick="showPanel('manager-dashboard')">
+        <span class="nav-icon">📊</span> Analytics
+      </div>
+      <div class="nav-item manager-only hidden" id="nav-employee-details" onclick="showPanel('employee-details')">
+        <span class="nav-icon">👥</span> Employee Details
+      </div>
+
+      <div class="nav-section-label overlord-only hidden" style="color:var(--accent-purple,#a78bfa)">⚡ Overlord</div>
+      <div class="nav-item overlord-only hidden" id="nav-overlord-db" onclick="showPanel('overlord-db')">
+        <span class="nav-icon">🗃️</span> DB Console
+      </div>
+      <div class="nav-item overlord-only hidden" id="nav-overlord-payload" onclick="showPanel('overlord-payload')">
+        <span class="nav-icon">📡</span> Payload Inspector
+      </div>
+      <div class="nav-item overlord-only hidden" id="nav-overlord-monitor" onclick="showPanel('overlord-monitor')">
+        <span class="nav-icon">📟</span> Server Monitor
+      </div>
+
+      <div class="sidebar-user">
+        <div class="sidebar-user-info">
+          <div class="user-avatar" id="user-avatar">U</div>
+          <div class="user-meta">
+            <div class="user-name" id="sidebar-username">-</div>
+            <div class="user-role standard" id="sidebar-role">standard</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-full btn-sm" onclick="logout()">
+          <span>🚪</span> Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <header class="top-bar">
+        <div>
+          <div class="top-bar-title" id="page-title">Dashboard</div>
+        </div>
+        <div class="top-bar-actions" id="top-bar-actions">
+        </div>
+      </header>
+
+      <div class="page-content">
+
+        <!-- ── Dashboard Panel ── -->
+        <div class="panel active" id="panel-dashboard">
+          <!-- Scraping Stats -->
+          <div class="section-header" style="margin-bottom:0.75rem">
+            <div>
+              <div class="section-title">🔍 Data Scraping Overview</div>
+            </div>
+          </div>
+          <div class="stats-grid" id="scraping-stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon blue">📧</div>
+              <div>
+                <div class="stat-value" id="stat-total-scraping">—</div>
+                <div class="stat-label">Total Emails</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--success-bg)">✅</div>
+              <div>
+                <div class="stat-value" id="stat-unused">—</div>
+                <div class="stat-label">Unused</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--warning-bg)">🔒</div>
+              <div>
+                <div class="stat-value" id="stat-reserved">—</div>
+                <div class="stat-label">Reserved</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--bg-elevated)">📤</div>
+              <div>
+                <div class="stat-value" id="stat-used">—</div>
+                <div class="stat-label">Used</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Progress Stats -->
+          <div class="section-header" style="margin-bottom:0.75rem">
+            <div>
+              <div class="section-title">📝 Employee Progress Overview</div>
+            </div>
+          </div>
+          <div class="stats-grid" id="progress-stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon blue">📋</div>
+              <div>
+                <div class="stat-value" id="stat-total-progress">—</div>
+                <div class="stat-label">Total Tasks</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon green">✅</div>
+              <div>
+                <div class="stat-value" id="stat-completed">—</div>
+                <div class="stat-label">Completed</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon blue">⚡</div>
+              <div>
+                <div class="stat-value" id="stat-in-progress">—</div>
+                <div class="stat-label">In Progress</div>
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon red">🕐</div>
+              <div>
+                <div class="stat-value" id="stat-not-started">—</div>
+                <div class="stat-label">Not Started</div>
+              </div>
+            </div>
+            <div class="stat-card admin-only hidden">
+              <div class="stat-icon purple">👥</div>
+              <div>
+                <div class="stat-value" id="stat-users">—</div>
+                <div class="stat-label">Total Users</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Recent Scraping Entries -->
+          <div class="section-header">
+            <div>
+              <div class="section-title">Recent Scraping Records</div>
+              <div class="section-subtitle">Latest 5 emails added</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="showPanel('scraping-all')">View All →</button>
+          </div>
+          <div class="table-wrapper">
+            <table id="dashboard-scraping-table">
+              <thead>
+                <tr>
+                  <th>Author</th>
+                  <th>Article Title</th>
+                  <th>Journal Name</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Website</th>
+                  <th>Added</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-scraping-tbody">
+                <tr>
+                  <td colspan="6" class="text-muted text-sm" style="padding:2rem;text-align:center">Loading…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Data Scraping — All Records Panel ── -->
+        <div class="panel" id="panel-scraping-all">
+          <div class="table-toolbar">
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input id="scraping-search" class="form-input" type="text"
+                placeholder="Search author, title, email, keyword…" oninput="debounceScrapingSearch()">
+            </div>
+            <select id="scraping-status-filter" class="form-select" style="width:auto" onchange="loadScraping()">
+              <option value="All">All Statuses</option>
+              <option value="Unused">Unused</option>
+              <option value="Reserved">Reserved</option>
+              <option value="Used">Used</option>
+            </select>
+            <div class="ml-auto flex gap-2">
+              <button class="btn btn-ghost btn-sm" id="btn-all-adv-filters" onclick="toggleAllAdvFilters()">⚙️ Advanced Filters</button>
+              <button class="btn btn-success btn-sm" onclick="showModal('add-scraping-modal')">＋ Add Record</button>
+              <button class="btn btn-ghost btn-sm admin-only hidden" id="btn-export-scraping"
+                onclick="exportScrapingCSV()">⬇️ Export CSV</button>
+            </div>
+          </div>
+
+          <!-- Advanced Filter Rules Panel (All Records) -->
+          <div id="all-advanced-filters" class="hidden"
+            style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;margin-bottom:1rem">
+            <div class="rules-section-title" style="margin-bottom:0.6rem">📋 Filter Rules
+              <span class="rules-hint">(Optional — define conditions to filter rows)</span>
+            </div>
+            <div id="all-filter-rule-rows"></div>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm" onclick="addAllFilterRule()">＋ Add Filter Rule</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearAllFilterRules()" style="color:var(--text-muted)">✕ Clear All</button>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Author</th>
+                  <th>Article Title</th>
+                  <th>Journal Name</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Keyword</th>
+                  <th>Website</th>
+                  <th>Affiliation</th>
+                  <th>Uploaded By</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="scraping-all-tbody">
+                <tr>
+                  <td colspan="10" class="text-muted text-sm" style="padding:2rem;text-align:center">Loading…</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination" id="scraping-all-pagination">
+              <div class="pagination-info" id="scraping-all-info">—</div>
+              <div class="pagination-controls" id="scraping-all-controls"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Data Scraping — My Collection Panel ── -->
+        <div class="panel" id="panel-scraping-mine">
+          <div class="section-header">
+            <div>
+              <div class="section-title">📁 My Collection</div>
+              <div class="section-subtitle">Your uploaded emails that are not yet used — update their status as you work
+                through them</div>
+            </div>
+          </div>
+
+          <!-- Queue Legend -->
+          <div id="mine-queue-legend" class="queue-legend-bar hidden"></div>
+
+          <!-- Hidden-column chips: shown when columns are removed from the table -->
+          <div id="mine-col-widgets" class="col-widgets-bar col-widgets-empty"></div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead id="scraping-mine-thead">
+                <!-- Populated dynamically by renderMineTableHeaders() -->
+              </thead>
+              <tbody id="scraping-mine-tbody">
+                <tr>
+                  <td colspan="11" class="text-muted text-sm" style="padding:2rem;text-align:center">Loading…</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="pagination" id="scraping-mine-pagination">
+              <div class="pagination-info" id="scraping-mine-info">—</div>
+              <div class="pagination-controls" id="scraping-mine-controls"></div>
+            </div>
+          </div>
+
+          <!-- Selection toolbar (floating) -->
+          <div id="mine-selection-toolbar" class="mine-selection-toolbar hidden"></div>
+        </div>
+
+        <!-- ═══════ Queue Assignment Modal ═══════ -->
+        <div class="modal-overlay hidden" id="queue-assign-modal">
+          <div class="modal" style="max-width:640px">
+            <div class="modal-header">
+              <div class="modal-title">🏷️ Assign to Queue</div>
+              <button class="modal-close" onclick="closeQueueModal()">✕</button>
+            </div>
+            <div class="modal-body" style="max-height:70vh;overflow-y:auto">
+
+              <!-- Queue Name — pick existing or create new -->
+              <div class="form-group" style="margin-bottom:1rem">
+                <label class="form-label">Queue</label>
+
+                <!-- Existing-queue dropdown (shown when queues exist) -->
+                <div id="queue-select-wrap" style="display:none; margin-bottom:0.5rem">
+                  <select id="queue-select" class="form-select" onchange="onQueueSelectChange(this.value)"
+                    style="width:100%">
+                  </select>
+                </div>
+
+                <!-- New-queue name input (always shown if no queues; revealed by "＋ New" option) -->
+                <div id="queue-new-name-wrap" style="display:none">
+                  <div style="display:flex;gap:0.5rem;align-items:center">
+                    <input id="queue-name-input" class="form-input" type="text"
+                      placeholder="New queue name…" autocomplete="off" style="flex:1">
+                    <!-- Back-to-dropdown link (only shown when queues exist) -->
+                    <button id="btn-back-to-queue-select" type="button"
+                      class="btn btn-ghost btn-sm" style="white-space:nowrap;display:none"
+                      onclick="switchToQueueSelect()">← Existing</button>
+                  </div>
+                </div>
+
+                <!-- Fallback input when there are NO existing queues at all -->
+                <div id="queue-empty-name-wrap">
+                  <input id="queue-name-input-empty" class="form-input" type="text"
+                    placeholder="e.g. Batch Alpha, Europe Q1…" autocomplete="off" style="width:100%">
+                </div>
+              </div>
+
+              <!-- Colour Picker (only relevant when creating a new queue) -->
+              <div id="queue-color-group" class="form-group" style="margin-bottom:1rem">
+                <label class="form-label">Queue Colour</label>
+                <div id="queue-color-picker" class="queue-color-picker">
+                  <button class="q-color-opt active" data-color="#8b5cf6" style="--qc:#8b5cf6"
+                    onclick="selectQueueColor(this)" title="Violet"></button>
+                  <button class="q-color-opt" data-color="#3b82f6" style="--qc:#3b82f6" onclick="selectQueueColor(this)"
+                    title="Blue"></button>
+                  <button class="q-color-opt" data-color="#06b6d4" style="--qc:#06b6d4" onclick="selectQueueColor(this)"
+                    title="Cyan"></button>
+                  <button class="q-color-opt" data-color="#10b981" style="--qc:#10b981" onclick="selectQueueColor(this)"
+                    title="Emerald"></button>
+                  <button class="q-color-opt" data-color="#f59e0b" style="--qc:#f59e0b" onclick="selectQueueColor(this)"
+                    title="Amber"></button>
+                  <button class="q-color-opt" data-color="#f43f5e" style="--qc:#f43f5e" onclick="selectQueueColor(this)"
+                    title="Rose"></button>
+                  <button class="q-color-opt" data-color="#ec4899" style="--qc:#ec4899" onclick="selectQueueColor(this)"
+                    title="Pink"></button>
+                  <button class="q-color-opt" data-color="#6366f1" style="--qc:#6366f1" onclick="selectQueueColor(this)"
+                    title="Indigo"></button>
+                </div>
+              </div>
+
+              <!-- Filter Rules (Optional) -->
+              <div class="rules-section"
+                style="border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;margin-bottom:1rem">
+                <div class="rules-section-title">📋 Filter Rules <span class="rules-hint">(Optional — define conditions
+                    to auto-select rows, or use your checkbox selection)</span></div>
+                <div id="queue-rule-rows"></div>
+                <button class="btn btn-ghost btn-sm" style="margin-top:0.5rem" onclick="addQueueFilterRule()">＋ Add
+                  Filter Rule</button>
+              </div>
+
+              <!-- Preview -->
+              <div id="queue-preview-section" class="hidden">
+                <div class="preview-header" style="margin-bottom:0.5rem">
+                  <span class="rules-section-title">👁 Preview</span>
+                  <span id="queue-preview-info" class="text-muted text-sm"></span>
+                </div>
+                <div class="upload-preview-table-wrap" style="max-height:200px">
+                  <table class="upload-preview-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Author</th>
+                        <th>Keyword</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="queue-preview-tbody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-ghost" onclick="closeQueueModal()">Cancel</button>
+              <button type="button" id="btn-apply-queue" class="btn btn-primary" onclick="applyQueueAssignment()">✓
+                Apply Queue</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Data Scraping — Upload Panel ── -->
+        <div class="panel" id="panel-scraping-upload">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Batch Upload</div>
+              <div class="section-subtitle">Upload a CSV or Excel file. Step 1 analyses every row against the database.
+                Step 2 lets you assign statuses before committing.</div>
+            </div>
+          </div>
+          <div id="upload-main-container" style="max-width:820px; transition: max-width 0.3s ease;">
+
+            <!-- ── Step navigation pills ── -->
+            <div class="upload-steps-nav" id="upload-steps-nav">
+              <div class="upload-step-pill step-pill-inactive" data-step="1">
+                <span class="step-pill-num">1</span>
+                <span class="step-pill-label">Analysis</span>
+              </div>
+              <div class="upload-step-connector"></div>
+              <div class="upload-step-pill step-pill-inactive" data-step="2">
+                <span class="step-pill-num">2</span>
+                <span class="step-pill-label">Upload</span>
+              </div>
+            </div>
+
+            <!-- Support Role: 'Uploaded For' dropdown (visible to support users only) -->
+            <div id="support-for-group" class="hidden"
+              style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:0.85rem 1rem;margin-bottom:1rem">
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:0.5rem">
+                👤 Uploading On Behalf Of <span style="color:var(--danger)">*</span>
+                <span style="font-weight:400;opacity:0.7">(required for campaigner uploads)</span>
+              </label>
+              <select id="support-for-sel" class="form-select" style="max-width:340px">
+                <option value="">-- Select Campaigner --</option>
+              </select>
+            </div>
+
+            <!-- ── Drop Zone ── -->
+            <div class="upload-zone" id="upload-zone" onclick="document.getElementById('scraping-file-input').click()"
+              ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+              <div class="upload-icon">📂</div>
+              <div class="upload-text">
+                <strong>Click to browse</strong> or drag &amp; drop<br>
+                Supports <strong>.csv</strong> and <strong>.xlsx</strong> files<br>
+                <span style="margin-top:0.5rem;display:block">Drop the file to start analysis — no data is saved until
+                  Step 2</span>
+              </div>
+            </div>
+            <input id="scraping-file-input" type="file" accept=".csv,.xlsx,.xls" style="display:none"
+              onchange="handleScrapingFileSelect(event)">
+
+            <!-- File Info Bar -->
+            <div id="file-selected" class="hidden"
+              style="display:flex;align-items:center;gap:0.75rem;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem 1rem;margin-bottom:1rem">
+              <span style="font-size:1.5rem">📑</span>
+              <div style="flex:1;overflow:hidden">
+                <div class="font-semibold" id="file-name"
+                  style="font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+                <div class="text-muted text-sm" id="file-size"></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="clearScrapingFile()">✕</button>
+            </div>
+
+            <!-- Advanced Filter Rules (Shared — Visible in both steps) -->
+            <div id="shared-preview-filters" class="hidden"
+              style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;margin-bottom:1rem">
+              <div class="rules-section-title" style="margin-bottom:0.6rem">📋 Data Filters
+                <span class="rules-hint">(Applies to both Analysis view and final Upload)</span>
+              </div>
+              <div id="upload-filter-rule-rows"></div>
+              <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;flex-wrap:wrap">
+                <button class="btn btn-ghost btn-sm" onclick="addUploadFilterRule()">＋ Add Filter Rule</button>
+                <button class="btn btn-ghost btn-sm" onclick="clearUploadFilterRules()" style="color:var(--text-muted)">✕ Clear All</button>
+              </div>
+            </div>
+
+            <!-- ═══════ STEP 1: ANALYSIS ═══════ -->
+            <div id="upload-step-1" class="hidden">
+              <div class="upload-step-header">
+                <span class="upload-step-title">🔍 Step 1 — Analysis Report</span>
+                <span class="upload-step-subtitle">Every row checked against the database — nothing is saved yet</span>
+              </div>
+              <div id="analysis-body"><!-- populated by runAnalysis() --></div>
+            </div>
+
+            <!-- ═══════ STEP 2: STATUS RULES + UPLOAD ═══════ -->
+            <div id="upload-step-2" class="hidden">
+              <div class="upload-step-header">
+                <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+                  <div>
+                    <span class="upload-step-title">⬆️ Step 2 — Upload</span>
+                    <span class="upload-step-subtitle">Assign statuses to new rows, then commit the upload</span>
+                  </div>
+                  <div style="margin-left:auto;display:flex;gap:0.5rem;flex-wrap:wrap">
+                    <button class="btn btn-ghost btn-sm" onclick="downloadBatchExcel()" title="Download current batch as Excel">⬇️ Download Batch Excel</button>
+                    <button class="btn btn-ghost btn-sm" onclick="goBackToAnalysis()">← Back to Analysis</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Status Assignment Rules Panel -->
+              <div id="status-rules-panel" class="upload-rules-panel hidden">
+                <button class="upload-rules-toggle" id="rules-toggle" onclick="toggleRulesPanel()">
+                  <span>🔧 Status Assignment Rules <span style="font-size:0.75rem;font-weight:400;opacity:0.7">(applies
+                      to New rows only)</span></span>
+                  <span id="rules-toggle-icon" class="rules-chevron">▾</span>
+                </button>
+
+                <div id="rules-body" class="upload-rules-body">
+
+                  <!-- Status Assignments -->
+                  <div class="rules-section">
+                    <div class="rules-section-title">📋 Status Assignments <span class="rules-hint">(Applied
+                        sequentially to new rows)</span></div>
+                    <div id="assignment-rows"></div>
+                    <button class="btn btn-ghost btn-sm" style="margin-top:0.5rem" onclick="addAssignmentRow()">＋ Add
+                      Rule</button>
+                  </div>
+
+                  <!-- Default Status -->
+                  <div class="rules-section" style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+                    <span class="rules-label" style="margin-bottom:0">Default status for new rows:</span>
+                    <select id="default-status" class="form-select" style="width:auto"
+                      onchange="refreshUploadPreview()">
+                      <option value="Unused">Unused</option>
+                      <option value="Reserved">Reserved</option>
+                      <option value="Used">Used</option>
+                    </select>
+                  </div>
+
+                </div><!-- /rules-body -->
+              </div><!-- /status-rules-panel -->
+
+              <!-- Upload Preview -->
+              <div id="upload-preview-section" class="hidden">
+                <div class="preview-header">
+                  <span class="rules-section-title">👁 Preview</span>
+                  <div id="preview-summary" class="preview-summary-bar"></div>
+                </div>
+                <div class="upload-preview-table-wrap">
+                  <table class="upload-preview-table" id="upload-preview-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Email</th>
+                        <th>Author</th>
+                        <th>Website</th>
+                        <th>Keyword</th>
+                        <th>Affiliation</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="upload-preview-tbody"></tbody>
+                  </table>
+                </div>
+                <div id="preview-footer" class="preview-footer-note"></div>
+              </div>
+
+              <!-- Upload Button + Result -->
+              <button id="btn-upload-scraping" class="btn btn-primary hidden" onclick="uploadScrapingFile()"
+                style="margin-top:1rem">
+                ⬆️ Upload File
+              </button>
+
+              <div id="upload-result" class="hidden"></div>
+
+            </div><!-- /upload-step-2 -->
+
+          </div><!-- /max-width wrapper -->
+
+          <div id="upload-instructions-block">
+            <div class="divider"></div>
+
+            <div style="display:flex; gap: 2rem; align-items: flex-start; flex-wrap: wrap;">
+              <!-- Left Column: Guide -->
+              <div style="flex:1; min-width: 320px; max-width:640px;">
+                <div class="section-header" style="margin-bottom:0.75rem;">
+                  <div>
+                    <div class="section-title">📋 Column Format Guide</div>
+                  </div>
+                </div>
+                <div
+                  style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-size:0.82rem;color:var(--text-secondary);">
+                  <p>Your file should have these column headers (case-insensitive):</p><br>
+                  <table style="width:100%;border-collapse:collapse">
+                    <thead>
+                      <tr>
+                        <th style="text-align:left;padding:0.4rem 0.6rem;background:var(--bg-elevated);border-radius:4px">
+                          Column</th>
+                        <th style="text-align:left;padding:0.4rem 0.6rem;background:var(--bg-elevated);border-radius:4px">
+                          Required</th>
+                        <th style="text-align:left;padding:0.4rem 0.6rem;background:var(--bg-elevated);border-radius:4px">
+                          Aliases accepted</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style="padding:0.4rem 0.6rem"><code>date</code></td>
+                        <td style="padding:0.4rem 0.6rem;color:var(--warning)">Optional</td>
+                        <td style="padding:0.4rem 0.6rem">Defaults to today</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0.4rem 0.6rem"><code>website</code></td>
+                        <td style="padding:0.4rem 0.6rem;color:var(--danger)">✓ Required</td>
+                        <td style="padding:0.4rem 0.6rem">site, source</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0.4rem 0.6rem"><code>keyword</code></td>
+                        <td style="padding:0.4rem 0.6rem;color:var(--danger)">✓ Required</td>
+                        <td style="padding:0.4rem 0.6rem">keywords</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0.4rem 0.6rem"><code>article_title</code></td>
+                        <td style="padding:0.4rem 0.6rem;color:var(--danger)">✓ Required</td>
+                        <td style="padding:0.4rem 0.6rem">title, article title</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0.4rem 0.6rem"><code>journal_name</code></td>
+                        <td style="padding:0.4rem 0.6rem;color:var(--danger)">✓ Required</td>
+                        <td style="padding:0.4rem 0.6rem">journal, journal name</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0.4rem 0.6rem"><code>author_name</code></td>
+                        <td style="padding:0.4rem 0.6rem;color:var(--danger)">✓ Required</td>
+                        <td style="padding:0.4rem 0.6rem">authors, authorname, author</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0.4rem 0.6rem"><code>email</code></td>
+                        <td style="padding:0.4rem 0.6rem;color:var(--danger)">✓ Required</td>
+                        <td style="padding:0.4rem 0.6rem">Must be unique across DB</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:0.4rem 0.6rem"><code>affiliation</code></td>
+                        <td style="padding:0.4rem 0.6rem;color:var(--success)">Optional</td>
+                        <td style="padding:0.4rem 0.6rem">organization, org</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Right Column: Allowed Websites -->
+              <div style="flex:1; min-width: 320px; max-width:640px;">
+                <div class="section-header" style="margin-bottom:0.75rem;">
+                  <div>
+                    <div class="section-title">🌐 Allowed Websites</div>
+                  </div>
+                </div>
+                <div
+                  style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;font-size:0.82rem;color:var(--text-secondary);">
+                  <p>Only the following exact names are allowed in the <code>website</code> column. Please ensure they are spelled correctly:</p><br>
+                  <div id="allowed-websites-container" style="display:flex; flex-wrap:wrap; gap: 0.5rem; margin-bottom: 1rem;">
+                    <span style="font-size:0.8rem; color:var(--text-muted)">Loading allowed websites...</span>
+                  </div>
+                  
+                  <div style="display:flex; gap: 0.5rem; align-items: center; border-top: 1px solid var(--border); padding-top: 1rem;">
+                    <input type="text" id="new-website-input" class="form-input" style="flex:1" placeholder="Add new website...">
+                    <button class="btn btn-ghost btn-sm" onclick="addAllowedWebsite()">＋ Add</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- ── Email Templates Panel ── -->
+        <div class="panel" id="panel-templates">
+          <div class="section-header" style="margin-bottom:1rem">
+            <div>
+              <div class="section-title">📝 Email Templates</div>
+              <div class="section-subtitle">Create and manage reusable email templates with dynamic column placeholders
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="tplNewTemplate()">＋ New Template</button>
+          </div>
+
+          <div class="templates-layout">
+
+            <!-- Left: template list -->
+            <div class="template-list-pane">
+              <div class="template-list-header">
+                <span class="template-list-title">📄 Templates</span>
+                <button class="btn btn-ghost btn-sm" onclick="tplNewTemplate()" title="New template">＋</button>
+              </div>
+              <div class="template-list-scroll" id="template-list-scroll">
+                <div class="template-list-empty">
+                  <div class="template-list-empty-icon">⏳</div>
+                  <p>Loading…</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: editor (dynamically populated by templates.js) -->
+            <div class="template-editor-pane" id="template-editor-pane">
+              <div class="template-editor-empty">
+                <div class="template-editor-empty-icon">✉️</div>
+                <h3>No Template Selected</h3>
+                <p>Choose a template from the list on the left, or create a new one to start editing.</p>
+                <button class="btn btn-primary btn-sm" style="margin-top:0.75rem" onclick="tplNewTemplate()">＋ New
+                  Template</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── Campaign Composer Panel ── -->
+        <div class="panel" id="panel-campaign-composer">
+          <div class="section-header" style="margin-bottom:1rem">
+            <div>
+              <div class="section-title">🎯 Campaign Composer</div>
+              <div class="section-subtitle">Build a temporary email list from your queue data and templates — never
+                saved to database</div>
+            </div>
+          </div>
+
+          <div class="campaign-composer-layout">
+
+            <!-- Step progress rail -->
+            <div class="cc-steps-rail" id="cc-steps-rail"></div>
+
+            <!-- ── Step 1: Select Queue ── -->
+            <div class="cc-step-card visible" id="cc-step-card-1">
+              <div class="cc-step-card-title">📁 Step 1 — Select a Queue</div>
+              <div class="cc-step-card-subtitle">Choose a queue from My Collection. All rows in that queue will be
+                available for template assignment.</div>
+              <div id="cc-step1-body">
+                <div style="color:var(--text-muted);font-size:0.82rem">Loading queues…</div>
+              </div>
+            </div>
+
+            <!-- ── Step 2: Pick Templates ── -->
+            <div class="cc-step-card" id="cc-step-card-2">
+              <div class="cc-step-card-title">📄 Step 2 — Select Templates</div>
+              <div class="cc-step-card-subtitle">Choose one or more templates. Set how many queue rows each template
+                should be applied to. Leave the count blank to auto-fill remaining rows.</div>
+              <div id="cc-step2-body">
+                <div style="color:var(--text-muted);font-size:0.82rem">Loading templates…</div>
+              </div>
+            </div>
+
+            <!-- ── Step 3: Generated List (result header) ── -->
+            <div class="cc-step-card" id="cc-step-card-3" style="display:none">
+              <div class="cc-step-card-title">✅ Campaign Generated</div>
+              <div class="cc-step-card-subtitle">Your temporary email list is ready below. Export as CSV or go back to
+                adjust template counts.</div>
+              <div class="cc-nav-btns" style="margin-top:0">
+                <button class="btn btn-ghost btn-sm" onclick="ccBackToStep2()">← Adjust</button>
+                <button class="btn btn-success btn-sm" onclick="exportCampaignCSV()">⬇️ Export CSV</button>
+                <button class="btn btn-ghost btn-sm" onclick="ccStartOver()" title="Clear session and start fresh">🔄
+                  Start Over</button>
+              </div>
+            </div>
+
+            <!-- ── Results section (rendered by JS) ── -->
+            <div class="cc-results-section" id="cc-results-section">
+              <div class="cc-results-header" id="cc-results-header">
+                <div class="cc-results-title">
+                  📋 Generated List
+                  <span class="cc-results-count" id="cc-results-count">0 rows</span>
+                </div>
+                <div class="cc-results-actions">
+                  <button class="btn btn-ghost btn-sm" onclick="ccBackToStep2()">← Adjust</button>
+                  <button class="btn btn-ghost btn-sm" onclick="ccStartOver()" title="Clear session and start fresh">🔄
+                    Start Over</button>
+                  <button class="btn btn-primary btn-sm" onclick="exportCampaignCSV()">⬇️ Export CSV</button>
+                </div>
+              </div>
+              <div class="cc-table-wrapper">
+                <table class="cc-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Email</th>
+                      <th>Template</th>
+                      <th>Subject</th>
+                      <th>Body</th>
+                    </tr>
+                  </thead>
+                  <tbody id="cc-results-tbody">
+                    <tr>
+                      <td colspan="5" class="cc-empty-state">
+                        <div class="cc-empty-icon">📋</div>
+                        <p>Generate a campaign to see results here.</p>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── Kanban — My Task Board (employee) ── -->
+        <div class="panel" id="panel-kanban-mine">
+          <div class="section-header">
+            <div>
+              <div class="section-title">🗂️ My Task Board</div>
+              <div class="section-subtitle">Your weekly / monthly tasks — drag cards between columns to update status</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="loadMyKanban()" title="Refresh">🔄 Refresh</button>
+          </div>
+          <div id="kanban-mine-root">
+            <div class="kanban-loading">Loading your task board…</div>
+          </div>
+
+          <!-- ── Unified Brand Approval + Invoice Block ── -->
+          <div id="kb-brand-approval-block" style="margin-top:2rem">
+            <div class="section-header" style="margin-bottom:0.75rem">
+              <div>
+                <div class="section-title" style="font-size:1rem">📋 Brand Approval &amp; Invoice</div>
+                <div class="section-subtitle">Search an author by email — log an approval or update an invoice</div>
+              </div>
+            </div>
+            <div class="action-block">
+
+              <!-- ── Search row ── -->
+              <div class="action-block-search">
+                <div class="form-group" style="flex:1;margin:0">
+                  <label class="form-label" for="kb-email-search">Search by Email</label>
+                  <input id="kb-email-search" class="form-input" type="text" placeholder="author@university.edu"
+                    oninput="kbSearchDebounce()">
+                </div>
+                <button class="btn btn-ghost btn-sm" style="align-self:flex-end" onclick="kbSearchEmail()">🔍
+                  Search</button>
+              </div>
+
+              <!-- ── Search results dropdown ── -->
+              <div id="kb-search-results" class="action-block-results hidden"></div>
+
+              <!-- ── Selected author card + all actions ── -->
+              <div id="kb-selected-info" class="action-block-selected hidden">
+
+                <!-- Author badge -->
+                <div class="selected-row-badge">
+                  <span id="kb-sel-name"></span>
+                  <span class="text-muted" style="font-size:0.78rem" id="kb-sel-email"></span>
+                  <span class="action-block-tag" id="kb-sel-brand"></span>
+                </div>
+
+                <!-- Inline brand editor — shown only when brand is missing -->
+                <div id="kb-brand-edit-row"
+                  style="display:none;margin-top:0.6rem;align-items:center;gap:0.5rem;flex-wrap:wrap">
+                  <input id="kb-brand-input" type="text" placeholder="Enter brand name…"
+                    style="flex:1;min-width:160px;padding:0.4rem 0.65rem;border-radius:6px;border:1px solid var(--border);background:var(--input-bg,var(--surface));color:var(--text);font-size:0.85rem" />
+                  <button id="kb-btn-save-brand" onclick="kbSaveBrand()"
+                    style="padding:0.4rem 1rem;border-radius:6px;background:var(--primary);color:#fff;border:none;cursor:pointer;font-size:0.85rem;font-weight:600">Save
+                    Brand</button>
+                  <span id="kb-brand-err" style="color:var(--danger);font-size:0.8rem;display:none"></span>
+                </div>
+
+                <!-- ── Existing invoices_history table ── -->
+                <div id="kb-history-wrap" style="margin-top:1rem">
+                  <div
+                    style="font-size:0.82rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem">
+                    Existing Invoice History</div>
+                  <div class="table-wrapper" style="margin:0;border-radius:8px;overflow:hidden">
+                    <table style="font-size:0.82rem">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                          <th>Invoice Date</th>
+                          <th>Approved?</th>
+                          <th>Approval Date</th>
+                        </tr>
+                      </thead>
+                      <tbody id="kb-history-tbody">
+                        <tr>
+                          <td colspan="6" class="text-muted text-sm" style="padding:0.75rem;text-align:center">No
+                            records yet</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- ── Two-column action area ── -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-top:1.25rem">
+
+                  <!-- LEFT: New Approval -->
+                  <div
+                    style="background:var(--surface-2,rgba(255,255,255,0.04));border:1px solid var(--border);border-radius:10px;padding:1rem">
+                    <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.75rem;color:var(--accent)">✅ New
+                      Approval</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">Creates a new entry in
+                      history with empty invoice fields — fill invoice details later.</div>
+                    <div class="form-group">
+                      <label class="form-label">Journal Got Approved</label>
+                      <div class="toggle-wrap">
+                        <label class="toggle-label">
+                          <input type="checkbox" id="kb-approved-toggle" checked>
+                          <span class="toggle-slider"></span>
+                          <span class="toggle-text" id="kb-approved-text">Yes — Approved</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="kb-approval-date">Date of Approval *</label>
+                      <input id="kb-approval-date" class="form-input" type="date" required>
+                    </div>
+                    <p id="kb-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+                    <div style="display:flex;gap:0.6rem;margin-top:0.75rem">
+                      <button class="btn btn-primary btn-sm" id="kb-btn-submit-ja" onclick="kbSubmitJournalApproval()">✅
+                        Submit Approval</button>
+                      <button class="btn btn-ghost btn-sm" onclick="kbClearSelection()">Clear</button>
+                    </div>
+                  </div>
+
+                  <!-- RIGHT: Update Invoice on Existing -->
+                  <div
+                    style="background:var(--surface-2,rgba(255,255,255,0.04));border:1px solid var(--border);border-radius:10px;padding:1rem">
+                    <div style="font-size:0.85rem;font-weight:600;margin-bottom:0.75rem;color:var(--warning,#f59e0b)">🧭
+                      Update Invoice</div>
+                    <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:0.75rem">Pick an existing
+                      invoice and fill in the amount / status / date.</div>
+                    <div class="form-group">
+                      <label class="form-label" for="kb-inv-no-select">Select Invoice #</label>
+                      <select id="kb-inv-no-select" class="form-select">
+                        <option value="">— select —</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="kb-inv-amount">Amount (₹ / $) *</label>
+                      <input id="kb-inv-amount" class="form-input" type="number" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="kb-inv-status">Status *</label>
+                      <select id="kb-inv-status" class="form-select">
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Paid">Paid</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" for="kb-inv-date">Invoice Date *</label>
+                      <input id="kb-inv-date" class="form-input" type="date">
+                    </div>
+                    <p id="kb-inv-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+                    <div style="display:flex;gap:0.6rem;margin-top:0.75rem">
+                      <button class="btn btn-sm" id="kb-btn-submit-inv" onclick="kbSubmitInvoiceUpdate()"
+                        style="background:var(--warning,#f59e0b);color:#000;font-weight:600">🧭 Update Invoice</button>
+                    </div>
+                  </div>
+
+                </div><!-- end two-column grid -->
+
+              </div><!-- end #kb-selected-info -->
+            </div><!-- end .action-block -->
+          </div><!-- end #kb-brand-approval-block -->
+
+        </div>
+
+        <!-- ── Kanban — Manage Sheets (admin) ── -->
+        <div class="panel" id="panel-kanban-admin">
+          <div class="section-header">
+            <div>
+              <div class="section-title">📋 Manage Kanban Sheets</div>
+              <div class="section-subtitle">Create sheet templates, assign tasks to team members, and review team progress</div>
+            </div>
+          </div>
+          <div id="kanban-admin-root">
+            <div class="kanban-loading">Loading sheets…</div>
+          </div>
+        </div>
+
+
+        <!-- ── Employee Progress — Charts (Admin) Panel ── -->
+        <div class="panel" id="panel-progress-charts">
+
+          <!-- Hero banner -->
+          <div class="manager-hero">
+            <div class="manager-hero-badge">📊 Admin Analytics</div>
+            <div class="manager-hero-title">Progress Dashboard</div>
+            <div class="manager-hero-subtitle">Team task analytics and performance overview</div>
+            <!-- Days filter + layout controls -->
+            <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1rem">
+              <div style="display:flex;align-items:center;gap:0.5rem">
+                <label class="form-label" style="margin:0;white-space:nowrap;font-size:0.78rem;color:#94a3b8">Last</label>
+                <select id="chart-days-filter" class="form-select" style="width:auto" onchange="loadProgressCharts()">
+                  <option value="7">7 days</option>
+                  <option value="14">14 days</option>
+                  <option value="30" selected>30 days</option>
+                  <option value="60">60 days</option>
+                  <option value="90">90 days</option>
+                </select>
+              </div>
+              <div class="dashboard-layout-controls" id="pc-layout-controls" style="margin-top:0">
+                <button id="pc-btn-edit-layout" class="btn-layout-edit" onclick="toggleProgressEdit()">
+                  <span id="pc-edit-layout-icon">✏️</span>
+                  <span id="pc-edit-layout-label">Edit Layout</span>
+                </button>
+                <button id="pc-btn-reset-layout" class="btn-layout-reset" onclick="resetProgressLayout()"
+                  title="Reset to default layout">↺ Reset</button>
+                <div class="lpp-wrap" id="pc-lpp-wrap">
+                  <button id="pc-btn-layout-presets" class="btn-layout-presets" onclick="openProgressPresetsPanel()"
+                    title="Manage saved layouts">
+                    <span>📐</span> Layouts
+                  </button>
+                  <!-- Presets dropdown panel -->
+                  <div id="pc-layout-presets-panel" class="layout-presets-panel"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress Dashboard Grid -->
+          <div id="progress-dashboard-grid" class="dashboard-grid">
+
+            <!-- Widget: KPI Cards -->
+            <div class="dashboard-widget" data-widget-id="pc-kpi" id="widget-pc-kpi">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">📊 KPI Overview</span></div>
+              <div class="widget-body" style="padding:0.75rem 1rem">
+                <div class="kpi-grid" id="pc-kpi-grid">
+                  <div class="kpi-card green"><span class="kpi-icon">💰</span>
+                    <div class="kpi-label">Total Revenue</div>
+                    <div class="kpi-value" id="pc-kpi-total-rev">—</div>
+                    <div class="kpi-change">All time</div>
+                  </div>
+                  <div class="kpi-card purple"><span class="kpi-icon">📅</span>
+                    <div class="kpi-label">Revenue This Month</div>
+                    <div class="kpi-value" id="pc-kpi-month-rev">—</div>
+                    <div class="kpi-change">Current month</div>
+                  </div>
+                  <div class="kpi-card blue"><span class="kpi-icon">🧾</span>
+                    <div class="kpi-label">Total Invoices</div>
+                    <div class="kpi-value" id="pc-kpi-invoices">—</div>
+                    <div class="kpi-change" id="pc-kpi-invoices-sub">—</div>
+                  </div>
+                  <div class="kpi-card orange"><span class="kpi-icon">📋</span>
+                    <div class="kpi-label">Pending Invoices</div>
+                    <div class="kpi-value" id="pc-kpi-pending">—</div>
+                    <div class="kpi-change">Awaiting approval</div>
+                  </div>
+                  <div class="kpi-card teal"><span class="kpi-icon">✅</span>
+                    <div class="kpi-label">Journal Approvals</div>
+                    <div class="kpi-value" id="pc-kpi-approvals">—</div>
+                    <div class="kpi-change" id="pc-kpi-approvals-sub">—</div>
+                  </div>
+                  <div class="kpi-card indigo"><span class="kpi-icon">📧</span>
+                    <div class="kpi-label">Campaign Reach</div>
+                    <div class="kpi-value" id="pc-kpi-reach">—</div>
+                    <div class="kpi-change">Emails sent</div>
+                  </div>
+                  <div class="kpi-card red"><span class="kpi-icon">⚡</span>
+                    <div class="kpi-label">Task Completion</div>
+                    <div class="kpi-value" id="pc-kpi-task-rate">—</div>
+                    <div class="kpi-change" id="pc-kpi-task-sub">—</div>
+                  </div>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Tasks by Date -->
+            <div class="dashboard-widget" data-widget-id="pc-by-date" id="widget-pc-by-date">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">📅 Tasks by Date</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Daily task submission breakdown by status</div>
+                <div class="chart-container" style="min-height:260px">
+                  <canvas id="chart-by-date"></canvas>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Status Distribution -->
+            <div class="dashboard-widget" data-widget-id="pc-status" id="widget-pc-status">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">🥧 Status Distribution</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Overall task status breakdown</div>
+                <div class="chart-container" style="min-height:220px">
+                  <canvas id="chart-status"></canvas>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Top Contributors -->
+            <div class="dashboard-widget" data-widget-id="pc-per-user" id="widget-pc-per-user">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">🏆 Top Contributors</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Tasks logged per team member</div>
+                <div class="chart-container" style="min-height:220px">
+                  <canvas id="chart-per-user"></canvas>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Revenue Trend -->
+            <div class="dashboard-widget" data-widget-id="pc-revenue" id="widget-pc-revenue">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">📈 Revenue Trend</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Revenue from approved/paid invoices</div>
+                <div class="chart-period-tabs" id="pc-revenue-tabs">
+                  <button class="chart-period-tab active" onclick="loadPcRevenueTrend('daily',this)">Daily</button>
+                  <button class="chart-period-tab" onclick="loadPcRevenueTrend('weekly',this)">Weekly</button>
+                  <button class="chart-period-tab" onclick="loadPcRevenueTrend('monthly',this)">Monthly</button>
+                  <button class="chart-period-tab" onclick="loadPcRevenueTrend('yearly',this)">Yearly</button>
+                </div>
+                <div class="chart-container" style="min-height:230px">
+                  <canvas id="chart-pc-revenue"></canvas>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Invoice Status Donut -->
+            <div class="dashboard-widget" data-widget-id="pc-invoice-donut" id="widget-pc-invoice-donut">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">🗂️ Invoice Status</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Breakdown by approval status</div>
+                <div class="chart-container" style="min-height:230px;display:flex;align-items:center;justify-content:center">
+                  <canvas id="chart-pc-invoice-donut"></canvas>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Revenue by Journal -->
+            <div class="dashboard-widget" data-widget-id="pc-journal-rev" id="widget-pc-journal-rev">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">📚 Revenue by Brand</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Top 8 brands by revenue generated</div>
+                <div class="chart-container" style="min-height:240px">
+                  <canvas id="chart-pc-journal-rev"></canvas>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Campaign Outreach -->
+            <div class="dashboard-widget" data-widget-id="pc-campaign" id="widget-pc-campaign">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">🎯 Campaign Outreach</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Daily emails sent (last 30 days)</div>
+                <div class="chart-container" style="min-height:210px">
+                  <canvas id="chart-pc-campaign"></canvas>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Top 3 Members -->
+            <div class="dashboard-widget" data-widget-id="pc-admin-perf" id="widget-pc-admin-perf">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">🏆 Top 3 Members</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Task completion rate — your team</div>
+                <div class="admin-perf-list" id="pc-admin-perf-list">
+                  <div style="color:var(--text-muted);font-size:0.82rem;padding:1rem">Loading…</div>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Email Records Scraped per Journal -->
+            <div class="dashboard-widget" data-widget-id="pc-reach-journal" id="widget-pc-reach-journal">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">📧 Email Records per Journal</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Email records scraped per journal (top 8)</div>
+                <div class="chart-container" style="min-height:240px">
+                  <canvas id="chart-pc-reach-journal"></canvas>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+            <!-- Widget: Latest 15 Invoices -->
+            <div class="dashboard-widget" data-widget-id="pc-recent-invoices" id="widget-pc-recent-invoices">
+              <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                  class="drag-label">🧾 Latest 15 Invoices</span></div>
+              <div class="widget-body">
+                <div class="chart-card-subtitle">Most recent invoice records</div>
+                <div class="table-wrapper" style="max-height:280px;overflow-y:auto">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Client</th>
+                        <th>Journal</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pc-recent-invoices-tbody">
+                      <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:1.5rem">Loading…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+            </div>
+
+          </div><!-- /#progress-dashboard-grid -->
+
+        </div><!-- /#panel-progress-charts -->
+
+        <!-- ── Users Panel (Admin) ── -->
+        <div class="panel" id="panel-users">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Pending Approvals</div>
+              <div class="section-subtitle">New registrations awaiting your review</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="showModal('add-user-modal')">＋ Create User</button>
+          </div>
+          <div id="pending-list">
+            <div class="text-muted text-sm">Loading…</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="section-header">
+            <div>
+              <div class="section-title">All Users</div>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Registered</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr>
+                  <td colspan="6" class="text-muted text-sm" style="padding:2rem;text-align:center">Loading…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ── Audit Panel (Admin) ── -->
+        <div class="panel" id="panel-audit">
+          <div class="section-header">
+            <div>
+              <div class="section-title">Audit Log</div>
+              <div class="section-subtitle">All system actions, newest first</div>
+            </div>
+          </div>
+          <div class="table-wrapper" style="max-height:70vh;overflow-y:auto">
+            <div id="audit-list">
+              <div class="text-muted text-sm" style="padding:2rem;text-align:center">Loading…</div>
+            </div>
+          </div>
+          <div class="pagination" id="audit-pagination">
+            <div class="pagination-info" id="audit-pagination-info">—</div>
+            <div class="pagination-controls" id="audit-pagination-controls"></div>
+          </div>
+        </div>
+
+        <!-- ── Overlord: DB Console ── -->
+        <div class="panel" id="panel-overlord-db">
+          <div class="section-header">
+            <div>
+              <div class="section-title">🗃️ DB Console</div>
+              <div class="section-subtitle">Run raw SQL queries against the live database</div>
+            </div>
+            <div style="display:flex;gap:0.5rem">
+              <button class="btn btn-ghost btn-sm" onclick="loadDbTables()">↻ Tables</button>
+              <button class="btn btn-primary btn-sm" onclick="runDbQuery()">▶ Run Query</button>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:260px 1fr;gap:1rem;margin-bottom:1rem">
+            <!-- Schema sidebar -->
+            <div class="olcard" style="max-height:420px;overflow-y:auto">
+              <div class="olcard-title">📂 Tables</div>
+              <div id="db-tables-list"><span class="text-muted text-sm">Click ↻ Tables</span></div>
+            </div>
+            <!-- Query area -->
+            <div style="display:flex;flex-direction:column;gap:0.75rem">
+              <div style="display:flex;gap:0.5rem">
+                <button id="db-tab-select" class="btn btn-primary btn-sm"
+                  onclick="switchDbTab('select')">SELECT</button>
+                <button id="db-tab-exec" class="btn btn-ghost btn-sm" onclick="switchDbTab('exec')">EXEC
+                  (INSERT/UPDATE/DELETE)</button>
+              </div>
+              <textarea id="db-sql-input" class="form-input"
+                style="min-height:130px;font-family:monospace;font-size:0.82rem"
+                placeholder="SELECT * FROM users LIMIT 20;"></textarea>
+              <div id="db-query-result" style="overflow-x:auto"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Overlord: Payload Inspector ── -->
+        <div class="panel" id="panel-overlord-payload">
+          <div class="section-header">
+            <div>
+              <div class="section-title">📡 API Payload Inspector</div>
+              <div class="section-subtitle">Last captured HTTP requests (newest first)</div>
+            </div>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+              <select id="payload-limit" class="form-select" style="width:90px;padding:0.3rem 0.5rem">
+                <option value="20">Last 20</option>
+                <option value="50" selected>Last 50</option>
+                <option value="100">Last 100</option>
+                <option value="200">Last 200</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="clearPayloadLog()">🗑 Clear</button>
+              <button class="btn btn-primary btn-sm" onclick="loadPayloads()">↻ Refresh</button>
+            </div>
+          </div>
+          <div id="payload-list" style="display:flex;flex-direction:column;gap:0.5rem;max-height:65vh;overflow-y:auto">
+            <div class="text-muted text-sm" style="padding:2rem;text-align:center">Click ↻ Refresh to load captured
+              payloads.</div>
+          </div>
+        </div>
+
+        <!-- ── Overlord: Server Monitor ── -->
+        <div class="panel" id="panel-overlord-monitor">
+          <div class="section-header">
+            <div>
+              <div class="section-title">📟 Server Monitor</div>
+              <div class="section-subtitle">Live server health — auto-refreshes every 5 s</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-monitor-toggle" onclick="toggleMonitor()">⏸ Pause</button>
+          </div>
+          <div class="stats-grid"
+            style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0.75rem;margin-bottom:1.25rem">
+            <div class="stat-card olcard">
+              <div class="stat-icon blue">💻</div>
+              <div>
+                <div class="stat-value" id="mon-cpu">—</div>
+                <div class="stat-label">CPU %</div>
+              </div>
+            </div>
+            <div class="stat-card olcard">
+              <div class="stat-icon" style="background:var(--warning-bg,#2d2010)">🧠</div>
+              <div>
+                <div class="stat-value" id="mon-ram">—</div>
+                <div class="stat-label">RAM %</div>
+              </div>
+            </div>
+            <div class="stat-card olcard">
+              <div class="stat-icon" style="background:var(--success-bg,#0d2010)">💾</div>
+              <div>
+                <div class="stat-value" id="mon-disk">—</div>
+                <div class="stat-label">Disk %</div>
+              </div>
+            </div>
+            <div class="stat-card olcard">
+              <div class="stat-icon" style="background:#1a1230">⏱️</div>
+              <div>
+                <div class="stat-value" id="mon-uptime">—</div>
+                <div class="stat-label">Uptime</div>
+              </div>
+            </div>
+            <div class="stat-card olcard">
+              <div class="stat-icon" style="background:#0d1a2d">📨</div>
+              <div>
+                <div class="stat-value" id="mon-reqs">—</div>
+                <div class="stat-label">Req Captured</div>
+              </div>
+            </div>
+            <div class="stat-card olcard">
+              <div class="stat-icon" style="background:#1a1010">🗄️</div>
+              <div>
+                <div class="stat-value" id="mon-db">—</div>
+                <div class="stat-label">DB Size (KB)</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div class="olcard">
+              <div class="olcard-title">Memory</div>
+              <div class="monitor-bar-wrap">
+                <div class="monitor-bar" id="mon-ram-bar"></div>
+              </div>
+              <div class="text-muted text-sm" id="mon-ram-detail">— MB / — MB</div>
+            </div>
+            <div class="olcard">
+              <div class="olcard-title">Disk</div>
+              <div class="monitor-bar-wrap">
+                <div class="monitor-bar" id="mon-disk-bar"></div>
+              </div>
+              <div class="text-muted text-sm" id="mon-disk-detail">— GB / — GB</div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /panel-overlord-monitor -->
+
+      <!-- ═══════════ MANAGER DASHBOARD PANEL ═══════════ -->
+      <div class="panel" id="panel-manager-dashboard">
+
+        <!-- Hero banner -->
+        <div class="manager-hero">
+          <div class="manager-hero-badge">🎯 Manager View</div>
+          <div class="manager-hero-title" id="mgr-greeting">Welcome back, Manager</div>
+          <div class="manager-hero-subtitle">Here's your operations overview for today</div>
+          <!-- Dashboard layout controls -->
+          <div class="dashboard-layout-controls" id="dashboard-layout-controls">
+            <button id="btn-edit-layout" class="btn-layout-edit" onclick="toggleDashboardEdit()">
+              <span id="edit-layout-icon">✏️</span>
+              <span id="edit-layout-label">Edit Layout</span>
+            </button>
+            <button id="btn-reset-layout" class="btn-layout-reset" onclick="resetDashboardLayout()"
+              title="Reset to default layout">↺ Reset</button>
+            <div class="lpp-wrap" id="lpp-wrap">
+              <button id="btn-layout-presets" class="btn-layout-presets" onclick="openLayoutPresetsPanel()"
+                title="Manage saved layouts">
+                <span>📐</span> Layouts
+              </button>
+              <!-- Presets dropdown panel -->
+              <div id="layout-presets-panel" class="layout-presets-panel"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Dashboard Grid ── -->
+        <div id="dashboard-grid" class="dashboard-grid">
+
+          <!-- Widget: KPI Cards -->
+          <div class="dashboard-widget" data-widget-id="kpi-row" id="widget-kpi-row">
+            <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                class="drag-label">KPI Overview</span></div>
+            <div class="widget-body">
+              <div class="kpi-grid" id="kpi-grid">
+                <div class="kpi-card green"><span class="kpi-icon">💰</span>
+                  <div class="kpi-label">Total Revenue</div>
+                  <div class="kpi-value" id="kpi-total-rev">—</div>
+                  <div class="kpi-change">All time</div>
+                </div>
+                <div class="kpi-card purple"><span class="kpi-icon">📅</span>
+                  <div class="kpi-label">Revenue This Month</div>
+                  <div class="kpi-value" id="kpi-month-rev">—</div>
+                  <div class="kpi-change">Current month</div>
+                </div>
+                <div class="kpi-card blue"><span class="kpi-icon">🧾</span>
+                  <div class="kpi-label">Total Invoices</div>
+                  <div class="kpi-value" id="kpi-invoices">—</div>
+                  <div class="kpi-change" id="kpi-invoices-sub">—</div>
+                </div>
+                <div class="kpi-card orange"><span class="kpi-icon">📋</span>
+                  <div class="kpi-label">Pending Invoices</div>
+                  <div class="kpi-value" id="kpi-pending">—</div>
+                  <div class="kpi-change">Awaiting approval</div>
+                </div>
+                <div class="kpi-card teal"><span class="kpi-icon">✅</span>
+                  <div class="kpi-label">Journal Approvals</div>
+                  <div class="kpi-value" id="kpi-approvals">—</div>
+                  <div class="kpi-change" id="kpi-approvals-sub">—</div>
+                </div>
+                <div class="kpi-card indigo"><span class="kpi-icon">📧</span>
+                  <div class="kpi-label">Campaign Reach</div>
+                  <div class="kpi-value" id="kpi-reach">—</div>
+                  <div class="kpi-change">Emails sent</div>
+                </div>
+                <div class="kpi-card pink"><span class="kpi-icon">👥</span>
+                  <div class="kpi-label">Admin Teams</div>
+                  <div class="kpi-value" id="kpi-admins">—</div>
+                  <div class="kpi-change" id="kpi-users-sub">—</div>
+                </div>
+                <div class="kpi-card red"><span class="kpi-icon">⚡</span>
+                  <div class="kpi-label">Task Completion</div>
+                  <div class="kpi-value" id="kpi-task-rate">—</div>
+                  <div class="kpi-change" id="kpi-task-sub">—</div>
+                </div>
+              </div>
+            </div>
+            <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+          </div>
+
+          <!-- Widget: Revenue Trend -->
+          <div class="dashboard-widget" data-widget-id="revenue-trend" id="widget-revenue-trend">
+            <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                class="drag-label">📈 Revenue Trend</span></div>
+            <div class="widget-body">
+              <div class="chart-card-subtitle">Total revenue from approved/paid invoices</div>
+              <div class="chart-period-tabs">
+                <button class="chart-period-tab active" onclick="loadRevenuChart('daily',this)">Daily</button>
+                <button class="chart-period-tab" onclick="loadRevenuChart('weekly',this)">Weekly</button>
+                <button class="chart-period-tab" onclick="loadRevenuChart('monthly',this)">Monthly</button>
+                <button class="chart-period-tab" onclick="loadRevenuChart('yearly',this)">Yearly</button>
+              </div>
+              <div class="chart-container" style="min-height:230px">
+                <canvas id="chart-revenue-trend"></canvas>
+              </div>
+            </div>
+            <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+          </div>
+
+          <!-- Widget: Invoice Status -->
+          <div class="dashboard-widget" data-widget-id="invoice-status" id="widget-invoice-status">
+            <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                class="drag-label">🗂️ Invoice Status</span></div>
+            <div class="widget-body">
+              <div class="chart-card-subtitle">Breakdown by approval status</div>
+              <div class="chart-container"
+                style="min-height:230px;display:flex;align-items:center;justify-content:center">
+                <canvas id="chart-invoice-donut"></canvas>
+              </div>
+            </div>
+            <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+          </div>
+
+          <!-- Widget: Revenue by Journal -->
+          <div class="dashboard-widget" data-widget-id="journal-rev" id="widget-journal-rev">
+            <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                class="drag-label">📚 Revenue by Brand</span></div>
+            <div class="widget-body">
+              <div class="chart-card-subtitle">Top 8 brands by revenue generated</div>
+              <div class="chart-container" style="min-height:240px">
+                <canvas id="chart-journal-rev"></canvas>
+              </div>
+            </div>
+            <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+          </div>
+
+          <!-- Widget: Admin Performance -->
+          <div class="dashboard-widget" data-widget-id="admin-perf" id="widget-admin-perf">
+            <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                class="drag-label">🏆 Admin Performance</span></div>
+            <div class="widget-body">
+              <div class="chart-card-subtitle">Task completion rate per admin</div>
+              <div class="admin-perf-list" id="admin-perf-list">
+                <div style="color:var(--text-muted);font-size:0.82rem;padding:1rem">Loading…</div>
+              </div>
+            </div>
+            <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+          </div>
+
+          <!-- Widget: Campaign Outreach -->
+          <div class="dashboard-widget" data-widget-id="campaign" id="widget-campaign">
+            <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                class="drag-label">🎯 Campaign Outreach</span></div>
+            <div class="widget-body">
+              <div class="chart-card-subtitle">Daily emails sent (last 30 days)</div>
+              <div class="chart-container" style="min-height:210px">
+                <canvas id="chart-campaign"></canvas>
+              </div>
+            </div>
+            <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+          </div>
+
+          <!-- Widget: Top Journals by Reach -->
+          <div class="dashboard-widget" data-widget-id="reach-journal" id="widget-reach-journal">
+            <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                class="drag-label">🏅 Top Journals by Reach</span></div>
+            <div class="widget-body">
+              <div class="chart-card-subtitle">Email records scraped per journal</div>
+              <div class="chart-container" style="min-height:210px">
+                <canvas id="chart-reach-journal"></canvas>
+              </div>
+            </div>
+            <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+          </div>
+
+          <!-- Widget: Recent Invoices -->
+          <div class="dashboard-widget" data-widget-id="recent-invoices" id="widget-recent-invoices">
+            <div class="widget-drag-handle" title="Drag to move"><span class="drag-dots">⠿</span><span
+                class="drag-label">🧾 Recent Invoices</span></div>
+            <div class="widget-body">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <div class="chart-card-subtitle" style="margin:0">Latest 15 invoices</div>
+                <button class="btn btn-ghost btn-sm" onclick="showPanel('manager-invoices')">View All →</button>
+              </div>
+              <div class="table-wrapper">
+                <table id="mgr-invoice-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Client</th>
+                      <th>Journal</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mgr-invoice-tbody">
+                    <tr>
+                      <td colspan="5" style="text-align:center;color:var(--text-muted);padding:1.5rem">Loading…</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="widget-resize-handle" title="Drag to resize">⤡</div>
+          </div>
+
+        </div><!-- /#dashboard-grid -->
+
+      </div><!-- /#panel-manager-dashboard -->
+
+      <!-- ═══════════ MANAGER INVOICES (full list) PANEL ═══════════ -->
+      <div class="panel" id="panel-manager-invoices">
+        <div class="section-header" style="margin-bottom:1rem">
+          <div>
+            <div class="section-title">🧾 All Invoices</div>
+            <div class="section-subtitle text-muted text-sm">Complete invoice ledger</div>
+          </div>
+          <div style="display:flex;gap:0.5rem">
+            <select id="invoice-status-filter" class="form-select" style="width:auto" onchange="loadManagerInvoices()">
+              <option value="All">All Status</option>
+              <option value="Pending">Pending</option>
+              <option value="Approved">Approved</option>
+              <option value="Paid">Paid</option>
+              <option value="Rejected">Rejected</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="showPanel('manager-dashboard')">← Back</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table id="invoice-full-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Client</th>
+                <th>Journal</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Approved By</th>
+              </tr>
+            </thead>
+            <tbody id="invoice-full-tbody">
+              <tr>
+                <td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem">Loading…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="invoice-pagination" style="display:flex;justify-content:center;gap:0.5rem;margin-top:1rem"></div>
+      </div>
+
+      <!-- ═══════════ EMPLOYEE DETAILS PANEL ═══════════ -->
+      <div class="panel" id="panel-employee-details">
+        <div class="emp-details-header">
+          <div class="section-header" style="margin-bottom:0.75rem">
+            <div>
+              <div class="section-title">👥 Employee Directory</div>
+              <div class="section-subtitle text-muted text-sm">Roles, responsibilities &amp; skill profiles</div>
+            </div>
+            <button class="btn btn-primary btn-sm manager-only hidden" onclick="openEmpEditModal(null)">+ Add
+              Profile</button>
+          </div>
+          <div class="emp-filter-bar">
+            <button class="emp-role-tab active" onclick="filterEmpByRole('all',this)">All</button>
+            <button class="emp-role-tab" onclick="filterEmpByRole('overlord',this)">⚡ Overlord</button>
+            <button class="emp-role-tab" onclick="filterEmpByRole('manager',this)">🎯 Manager</button>
+            <button class="emp-role-tab" onclick="filterEmpByRole('admin',this)">🛡️ Admin</button>
+            <button class="emp-role-tab" onclick="filterEmpByRole('standard',this)">👤 Standard</button>
+          </div>
+        </div>
+        <div class="emp-grid" id="emp-grid">
+          <div style="color:var(--text-muted);font-size:0.85rem;padding:2rem">Loading…</div>
+        </div>
+      </div>
+
+    </div><!-- /page-content -->
+  </div><!-- /main-content -->
+  </div><!-- /app-screen -->
+
+  <!-- ═════════════ MODALS ═════════════ -->
+
+  <!-- Add Scraping Record Modal -->
+  <div class="modal-overlay hidden" id="add-scraping-modal">
+    <div class="modal" style="max-width:580px">
+      <div class="modal-header">
+        <div class="modal-title">Add Scraping Record</div>
+        <button class="modal-close" onclick="closeModal('add-scraping-modal')">✕</button>
+      </div>
+      <form onsubmit="handleAddScraping(event)">
+        <div class="modal-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div class="form-group">
+              <label class="form-label" for="sc-date">Date *</label>
+              <input id="sc-date" class="form-input" type="date" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sc-website">Website</label>
+              <input id="sc-website" class="form-input" type="text" placeholder="e.g. pubmed.ncbi.nlm.nih.gov">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sc-keyword">Keyword</label>
+              <input id="sc-keyword" class="form-input" type="text" placeholder="Search keyword used">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sc-email">Email *</label>
+              <input id="sc-email" class="form-input" type="email" placeholder="author@university.edu" required>
+            </div>
+            <div style="margin-bottom:1rem">
+              <label class="form-label" for="sc-title">Article Title *</label>
+              <input id="sc-title" class="form-input" type="text" placeholder="Full article title" required>
+            </div>
+            <div style="margin-bottom:1rem">
+              <label class="form-label" for="sc-journal">Journal Name *</label>
+              <input id="sc-journal" class="form-input" type="text" placeholder="Journal name" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sc-author">Author Name *</label>
+              <input id="sc-author" class="form-input" type="text" placeholder="First Last" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="sc-affiliation">Affiliation <span
+                  style="font-weight:400;text-transform:none;font-size:0.72rem">(optional)</span></label>
+              <input id="sc-affiliation" class="form-input" type="text" placeholder="University / Institution">
+            </div>
+          </div>
+          <p id="add-scraping-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('add-scraping-modal')">Cancel</button>
+          <button type="submit" id="btn-add-scraping" class="btn btn-primary">Add Record</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Scraping Record Modal (Admin) -->
+  <div class="modal-overlay hidden" id="edit-scraping-modal">
+    <div class="modal" style="max-width:580px">
+      <div class="modal-header">
+        <div class="modal-title">Edit Scraping Record</div>
+        <button class="modal-close" onclick="closeModal('edit-scraping-modal')">✕</button>
+      </div>
+      <form onsubmit="handleEditScraping(event)">
+        <div class="modal-body">
+          <input type="hidden" id="edit-sc-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+            <div class="form-group">
+              <label class="form-label" for="edit-sc-date">Date</label>
+              <input id="edit-sc-date" class="form-input" type="date">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-sc-website">Website</label>
+              <input id="edit-sc-website" class="form-input" type="text">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-sc-keyword">Keyword</label>
+              <input id="edit-sc-keyword" class="form-input" type="text">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-sc-email">Email</label>
+              <input id="edit-sc-email" class="form-input" type="email">
+            </div>
+            <div style="margin-bottom:1rem">
+              <label class="form-label" for="edit-sc-title">Article Title</label>
+              <input id="edit-sc-title" class="form-input" type="text">
+            </div>
+            <div style="margin-bottom:1rem">
+              <label class="form-label" for="edit-sc-journal">Journal Name</label>
+              <input id="edit-sc-journal" class="form-input" type="text">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-sc-author">Author Name</label>
+              <input id="edit-sc-author" class="form-input" type="text">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-sc-affiliation">Affiliation</label>
+              <input id="edit-sc-affiliation" class="form-input" type="text">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-sc-status">Email Status</label>
+              <select id="edit-sc-status" class="form-select">
+                <option value="Unused">Unused</option>
+                <option value="Reserved">Reserved</option>
+                <option value="Used">Used</option>
+              </select>
+            </div>
+          </div>
+          <p id="edit-scraping-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('edit-scraping-modal')">Cancel</button>
+          <button type="submit" id="btn-save-scraping" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- Create User Modal (Admin) -->
+  <div class="modal-overlay hidden" id="add-user-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Create User</div>
+        <button class="modal-close" onclick="closeModal('add-user-modal')">✕</button>
+      </div>
+      <form onsubmit="handleCreateUser(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="new-username">Username *</label>
+            <input id="new-username" class="form-input" type="text" placeholder="Choose a username" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-password">Password *</label>
+            <input id="new-password" class="form-input" type="password" placeholder="At least 6 characters" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-role">Role *</label>
+            <select id="new-role" class="form-select">
+              <option value="standard">Standard User</option>
+              <option value="admin">Administrator</option>
+              <option value="overlord" class="overlord-only hidden">⚡ Overlord</option>
+            </select>
+          </div>
+          <p id="create-user-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" onclick="closeModal('add-user-modal')">Cancel</button>
+          <button type="submit" id="btn-create-user" class="btn btn-primary">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div class="modal-overlay hidden" id="confirm-delete-modal">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-header">
+        <div class="modal-title">Confirm Delete</div>
+        <button class="modal-close" onclick="closeModal('confirm-delete-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirm-delete-msg" style="color:var(--text-secondary);font-size:0.9rem">Are you sure?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('confirm-delete-modal')">Cancel</button>
+        <button class="btn btn-danger" id="btn-confirm-delete">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Password Reset Modal (Overlord) -->
+  <div class="modal-overlay hidden" id="reset-pw-modal">
+    <div class="modal" style="max-width:400px">
+      <div class="modal-header">
+        <div class="modal-title">🔑 Reset Password</div>
+        <button class="modal-close" onclick="closeModal('reset-pw-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="reset-pw-msg" style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:1rem"></p>
+        <div class="form-group">
+          <label class="form-label" for="reset-pw-new">New Password *</label>
+          <input id="reset-pw-new" class="form-input" type="password" placeholder="At least 6 characters" required>
+        </div>
+        <p id="reset-pw-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('reset-pw-modal')">Cancel</button>
+        <button class="btn btn-primary" id="btn-do-reset-pw" onclick="doResetPassword()">Reset Password</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Role Change Modal (Overlord) -->
+  <div class="modal-overlay hidden" id="change-role-modal">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-header">
+        <div class="modal-title">🎭 Change Role</div>
+        <button class="modal-close" onclick="closeModal('change-role-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="change-role-msg" style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:1rem"></p>
+        <div class="form-group">
+          <label class="form-label" for="change-role-select">New Role *</label>
+          <select id="change-role-select" class="form-select">
+            <option value="standard">Standard User</option>
+            <option value="admin">Administrator</option>
+            <option value="manager">🎯 Manager</option>
+            <option value="overlord">⚡ Overlord</option>
+          </select>
+        </div>
+        <p id="change-role-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('change-role-modal')">Cancel</button>
+        <button class="btn btn-primary" id="btn-do-change-role" onclick="doChangeRole()">Save Role</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Rename Username Modal (Overlord-only) -->
+  <div class="modal-overlay hidden" id="rename-user-modal">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Rename Username</div>
+        <button class="modal-close" onclick="closeModal('rename-user-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="rename-user-msg" style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:1rem"></p>
+        <div class="form-group">
+          <label class="form-label" for="rename-user-input">New Username *</label>
+          <input
+            id="rename-user-input"
+            class="form-input"
+            type="text"
+            placeholder="At least 3 characters"
+            autocomplete="off"
+            onkeydown="if(event.key==='Enter') doRenameUser()"
+          >
+        </div>
+        <p id="rename-user-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('rename-user-modal')">Cancel</button>
+        <button class="btn btn-primary" id="btn-do-rename-user" onclick="doRenameUser()">Save Username</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Employee Profile Modal -->
+  <div class="modal-overlay hidden" id="emp-edit-modal">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Edit Employee Profile</div>
+        <button class="modal-close" onclick="closeModal('emp-edit-modal')">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="emp-edit-user-id">
+        <div class="form-group">
+          <label class="form-label">Job Title *</label>
+          <input id="emp-edit-title" class="form-input" placeholder="e.g. Data Operations Specialist">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <input id="emp-edit-dept" class="form-input" placeholder="e.g. Operations">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Skills <span
+              style="color:var(--text-muted);font-size:0.75rem">(comma-separated)</span></label>
+          <input id="emp-edit-skills" class="form-input" placeholder="e.g. Data Scraping, Excel, CRM">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Responsibilities <span style="color:var(--text-muted);font-size:0.75rem">(one per
+              line)</span></label>
+          <textarea id="emp-edit-resp" class="form-input" rows="4" style="resize:vertical"
+            placeholder="Enter each responsibility on a new line"></textarea>
+        </div>
+        <p id="emp-edit-error" class="text-sm" style="color:var(--danger);display:none;margin-top:0.5rem"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('emp-edit-modal')">Cancel</button>
+        <button class="btn btn-primary" id="btn-save-emp" onclick="saveEmpProfile()">Save Profile</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- JS: load order matters — core first, then features -->
+  <script src="/static/js/core.js?v=8"></script>
+  <script src="/static/js/auth.js?v=9"></script>
+  <script src="/static/js/nav.js?v=10"></script>
+  <script src="/static/js/dashboard.js?v=7"></script>
+  <script src="/static/js/scraping-all.js?v=7"></script>
+  <script src="/static/js/scraping-mine.js?v=8"></script>
+  <script src="/static/js/scraping-analysis.js?v=1"></script>
+  <script src="/static/js/scraping-upload.js?v=13"></script>
+  <script src="/static/js/templates.js?v=2"></script>
+  <script src="/static/js/campaign-composer.js?v=5"></script>
+  <script src="/static/js/campaign-composer-ext.js?v=1"></script>
+  <script src="/static/js/progress-charts.js?v=3"></script>
+  <script src="/static/js/kanban.js?v=1"></script>
+  <script src="/static/js/kanban-admin.js?v=1"></script>
+  <script src="/static/js/admin.js?v=7"></script>
+  <script src="/static/js/overlord.js?v=1"></script>
+  <script src="/static/js/manager.js?v=2"></script>
+  <script src="/static/js/dashboard-grid.js?v=1"></script>
+</body>
+
+</html>

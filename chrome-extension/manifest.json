@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "DataBase Campaign Copier",
+  "version": "1.2",
+  "description": "Global Ctrl+D (next) and Ctrl+W (back) hotkeys for sequential copy mode in Campaign Composer. Restricted to configured origins only.",
+
+  "permissions": [
+    "tabs",
+    "scripting",
+    "clipboardWrite",
+    "offscreen"
+  ],
+
+  "host_permissions": [
+    "http://10.22.86.75:8000/*",
+    "http://localhost:8000/*"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["http://10.22.86.75:8000/*", "http://localhost:8000/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "commands": {
+    "sequential-copy-next": {
+      "suggested_key": {
+        "default": "Ctrl+D"
+      },
+      "description": "Copy next value in Campaign Composer sequential copy mode",
+      "global": true
+    },
+    "sequential-copy-prev": {
+      "suggested_key": {
+        "default": "Ctrl+W"
+      },
+      "description": "Go back one step in Campaign Composer sequential copy mode",
+      "global": true
+    }
+  }
+}
